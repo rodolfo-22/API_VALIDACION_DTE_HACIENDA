@@ -55,44 +55,55 @@ public class FacturaPdfService {
                 // Reserva de logo (solo rectángulo vacío)
                 float logoW = 150f, logoH = 40f;
                 drawRectStroke(cs, ml, yTop - logoH + 8f, logoW, logoH, new Color(0,0,0)); // placeholder
-                // Título centrado
-                cs.setFont(fontBold, 14);
-                drawCentered(cs, ml + logoW + 10f, box.getUpperRightX() - mr, yTop + 4f, "DOCUMENTO TRIBUTARIO ELECTRÓNICO");
-                cs.setFont(fontReg, 12);
-                drawCentered(cs, ml + logoW + 10f, box.getUpperRightX() - mr, yTop - 12f, "FACTURA");
+// Título centrado (un poco más pequeño)
+                cs.setFont(fontBold, 14); // antes 14
+                drawCentered(cs, ml + logoW + 10f, box.getUpperRightX() - mr, yTop + 6f, "DOCUMENTO TRIBUTARIO ELECTRÓNICO");
+                cs.setFont(fontReg, 13);  // antes 12
+                drawCentered(cs, ml + logoW + 10f, box.getUpperRightX() - mr, yTop - 8f, "FACTURA");
 
-                // QR en esquina superior derecha
-                String qrText = "CG: " + safe(req.codigoGeneracion) + " | NC: " + safe(req.numeroControl) + " | FH: " + safe(req.fechaHora);
-                BufferedImage qrImg = qr(qrText, 110, 110);
-                PDImageXObject qrX = LosslessFactory.createFromImage(doc, qrImg);
-                float qrXpos = box.getUpperRightX() - mr - 110f;
-                float qrYpos = yTop - 110f + 8f;
-                cs.drawImage(qrX, qrXpos, qrYpos, 110f, 110f);
-
-                // Banda info bajo título (dos columnas, línea superior e inferior)
-                float bandTopY = yTop - 52f;
-                float bandHeight = 50f;
-                drawLine(cs, ml, bandTopY, box.getUpperRightX() - mr, bandTopY, 1.2f, Color.BLACK);
+// Geometría de la banda (debajo del título)
+                 contentWidth = box.getWidth() - ml - mr;
+                float bandTopY    = yTop - 60f;   // más abajo para no tocar el título
+                float bandHeight  = 56f;
                 float bandBottomY = bandTopY - bandHeight;
-                drawLine(cs, ml, bandBottomY, box.getUpperRightX() - mr, bandBottomY, 1.2f, Color.BLACK);
+                float midX        = ml + contentWidth/2f;
 
-                // línea vertical al centro
-                float midX = ml + contentWidth/2f;
+// Dimensiones/posición del QR (centrado vertical en la banda, a la derecha)
+                final float qrSize = 85f;   // tamaño del QR que cabe en la banda
+                final float qrPad  = 4f;    // margen entre QR y líneas
+                float qrXpos = box.getUpperRightX() - mr - qrSize;
+                float qrYpos = bandBottomY + (bandHeight - qrSize) / 2f;
+
+// Líneas de la banda: llegan hasta antes del QR (no lo atraviesan)
+                float rightLineStop = qrXpos - qrPad; // detén la línea un poco antes del QR
+                drawLine(cs, ml, bandTopY,    rightLineStop, bandTopY,    1.2f, Color.BLACK);
+                drawLine(cs, ml, bandBottomY, rightLineStop, bandBottomY, 1.2f, Color.BLACK);
+
+// Separador vertical al centro (queda antes del QR)
                 drawLine(cs, midX, bandTopY, midX, bandBottomY, 2f, Color.BLACK);
 
-                cs.setFont(fontReg, 8.5f);
-                float leftX = ml + 6f;
-                float rightX = midX + 6f;
-                float y = bandTopY - 14f;
-                drawText(cs, leftX, y, "Código de Generación: " + safe(req.codigoGeneracion)); y -= 12f;
-                drawText(cs, leftX, y, "Número de Control: " + safe(req.numeroControl)); y -= 12f;
-                String sello = "Sello de recepción: (se genera en respuesta ministerio)";
-                drawText(cs, leftX, y, sello);
+// Textos dentro de la banda (fuente más pequeña para que quepan)
+                cs.setFont(fontReg, 7f);
+                float leftX  = ml + 8f;
+                float rightX = midX + 8f;
+                float yL = bandTopY - 16f;
+                drawText(cs, leftX, yL,   "Código de Generación: " + safe(req.codigoGeneracion)); yL -= 12f;
+                drawText(cs, leftX, yL,   "Número de Control: " + safe(req.numeroControl));       yL -= 12f;
+                drawText(cs, leftX, yL,   "Sello de recepción: (se genera en respuesta ministerio)");
 
-                float yr = bandTopY - 14f;
-                drawText(cs, rightX, yr, "Modelo de facturación: Modelo Facturación Previo"); yr -= 12f;
-                drawText(cs, rightX, yr, "Tipo de Transmisión: Transmisión normal"); yr -= 12f;
-                drawText(cs, rightX, yr, "Fecha y Hora de Generación: " + safe(req.fechaHora));
+                float yR = bandTopY - 16f;
+                drawText(cs, rightX, yR,  "Modelo de Facturación: Modelo Facturación Previo"); yR -= 12f;
+                drawText(cs, rightX, yR,  "Tipo de Transmisión: Transmisión normal");          yR -= 12f;
+                drawText(cs, rightX, yR,  "Fecha y Hora de Generación: " + safe(req.fechaHora));
+
+// (¡AL FINAL!) dibuja el QR para que no tape textos ni líneas
+                String qrText = "CG: " + safe(req.codigoGeneracion) + " | NC: " + safe(req.numeroControl) + " | FH: " + safe(req.fechaHora);
+                BufferedImage qrImg = qr(qrText, (int)qrSize, (int)qrSize);
+                PDImageXObject qrX = LosslessFactory.createFromImage(doc, qrImg);
+                cs.drawImage(qrX, qrXpos, qrYpos, qrSize, qrSize);
+
+
+
 
                 // ====== Secciones EMISOR / RECEPTOR en dos columnas ======
                 float sectionTop = bandBottomY - 16f;
@@ -106,15 +117,16 @@ public class FacturaPdfService {
 
                 // vertical separador
                 float infoTopY = sectionTop - 16f;
-                float infoBottomY = infoTopY - 86f;
-                drawLine(cs, midX, infoTopY + 2f, midX, infoBottomY - 2f, 2f, Color.BLACK);
-                drawLine(cs, ml, infoBottomY, box.getUpperRightX() - mr, infoBottomY, 2f, Color.BLACK);
+                 midX = ml + contentWidth/2f; // Asegúrate de tener esta var disponible
+                drawLine(cs, midX, infoTopY + 2f, midX, infoTopY - 100f, 2f, Color.BLACK); // línea larga (luego no importa)
 
-                cs.setFont(fontReg, 8.5f);
+                // ---- CONTENIDO EMISOR/RECEPTOR ----
+                cs.setFont(fontReg, 7f);
                 float colPad = 8f;
                 float lx = ml + colPad;
                 float rx2 = midX + colPad;
                 float ly = infoTopY - 4f;
+
                 // Emisor
                 ly = drawField(cs, lx, ly, "Nombre o Razón Social:", em.nombreRazonSocial);
                 ly = drawField(cs, lx, ly, "NIT:", em.nit);
@@ -125,6 +137,7 @@ public class FacturaPdfService {
                 ly = drawField(cs, lx, ly, "Correo Electrónico:", em.correo);
                 ly = drawField(cs, lx, ly, "Nombre Comercial:", em.nombreComercial);
                 ly = drawField(cs, lx, ly, "Establecimiento:", em.establecimiento);
+                float endLeft = ly; // <-- y final lado izquierdo
 
                 // Receptor
                 float ry2 = infoTopY - 4f;
@@ -134,23 +147,31 @@ public class FacturaPdfService {
                 ry2 = drawField(cs, rx2, ry2, "Dirección:", rc.direccion);
                 ry2 = drawField(cs, rx2, ry2, "Correo Electrónico:", rc.correo);
                 ry2 = drawField(cs, rx2, ry2, "Número de teléfono:", rc.telefono);
+                float endRight = ry2; // <-- y final lado derecho
+
+                // AHORA sí: base del bloque calculada por el contenido más largo
+                float infoBottomY = Math.min(endLeft, endRight) - 6f; // pequeño padding
+                drawLine(cs, ml, infoBottomY, box.getUpperRightX() - mr, infoBottomY, 2f, Color.BLACK);
 
                 // ====== Tabla de Items ======
-                float tblTop = infoBottomY - 20f;
+                float gapToTable = 18f;
+                float tblTop = infoBottomY - gapToTable;
+
                 drawHeaderBar(cs, ml, tblTop, contentWidth, 18f, new Color(212,60,60));
-                cs.setFont(fontBold, 8.5f);
+                cs.setFont(fontBold, 8.2f);
                 cs.setNonStrokingColor(Color.WHITE);
                 drawText(cs, ml + 6f, tblTop + 5f,
-                        String.format("%-4s %-8s %-5s %-7s %-56s %12s %12s %12s %12s",
-                                "N°","Código","Cant.","Unidad","Descripción","Precio Unitario","Desc. Item","No Suj.","Exentas","Gravadas"));
+                        String.format("%-4s %-8s %-5s %-8s %-46s %11s %11s %11s %11s",
+                                "N°", "Código", "Cant.", "Unidad", "Descripción",
+                                "Precio Unit.", "Desc. Item", "No Suj.", "Exentas", "Gravadas"));
                 cs.setNonStrokingColor(Color.BLACK);
-                cs.setFont(monoReg, 8.2f);
+                cs.setFont(monoReg, 6.5f);
 
                 float yi = tblTop - 18f - 6f;
                 List<FacturaRequest.Item> items = req.items != null ? req.items : List.of();
                 for (FacturaRequest.Item it : items) {
-                    String desc = trunc(safe(it.descripcion), 56);
-                    String linea = String.format("%-4d %-8s %-5d %-7s %-56s %12s %12s %12s %12s",
+                    String desc = trunc(safe(it.descripcion), 45); // <-- antes 56
+                    String linea = String.format("%-4d %-8s %-5d %-8s %-46s %11s %11s %11s %11s",
                             it.posicion,
                             safe(it.codigo),
                             it.cantidad,
@@ -162,65 +183,116 @@ public class FacturaPdfService {
                             safe(def0(it.ventasExentas)),
                             safe(def0(it.ventasGravadas))
                     );
-                    drawText(cs, ml + 6f, yi, linea);
+                    drawText(cs, ml + 6f, yi, linea); // se mantiene pegado al margen izquierdo
                     yi -= 12f;
                 }
 
+
                 // ====== Panel inferior: Detalles (izq) y Suma Total (der) ======
-                float contentBottom = 72f;
-                float leftW = contentWidth * 0.60f;
+                float leftW  = contentWidth * 0.60f;
                 float rightW = contentWidth - leftW;
                 float blockTop = yi - 12f;
 
-                // Caja izquierda
-                drawBox(cs, ml, blockTop, leftW, 120f, new Color(212,60,60), 1.2f);
-                cs.setFont(fontBold, 9f);
+// más alto para que todo quepa
+                final float boxH = 140f;
+
+// ---------- Caja izquierda ("Detalles") ----------
+                drawBox(cs, ml, blockTop, leftW, boxH, new Color(212,60,60), 1.2f);
+                cs.setFont(fontBold, 7.6f);
                 cs.setNonStrokingColor(Color.WHITE);
                 drawText(cs, ml + 8f, blockTop + 5f, "Detalles");
                 cs.setNonStrokingColor(Color.BLACK);
-                cs.setFont(fontReg, 8.5f);
+                cs.setFont(fontReg, 6.3f);
 
+                float dPadX = ml + 8f;
                 float dY = blockTop - 16f;
-                dY = drawField(cs, ml + 8f, dY, "Total en letras:", req.totalEnLetras);
-                dY = drawField(cs, ml + 8f, dY, "Condición de la Operación:", "CONTADO - N1");
-                drawLine(cs, ml + 8f, dY - 2f, ml + leftW - 8f, dY - 2f, .6f, Color.LIGHT_GRAY); dY -= 10f;
-                dY = drawField(cs, ml + 8f, dY, "Responsable por parte del EMISOR:", "");
-                dY = drawField(cs, ml + 8f + (leftW/2f - 16f), dY + 12f, "N° Documento:", ""); dY -= 22f;
-                dY = drawField(cs, ml + 8f, dY, "Responsable por parte del RECEPTOR:", "");
-                dY = drawField(cs, ml + 8f + (leftW/2f - 16f), dY + 12f, "N° Documento:", ""); dY -= 22f;
-                dY = drawField(cs, ml + 8f, dY, "Número de control Vidri:", safe(req.numeroControl).replace("DTE-01-", ""));
-                dY = drawField(cs, ml + 8f, dY, "Vendedor:", "");
-                dY = drawField(cs, ml + 8f, dY, "Código interno:", "");
 
-                // Caja derecha
+// fila: total en letras (fondo gris claro como en maqueta)
+                rowBg(cs, ml + 1f, dY + 2f, leftW - 2f, 12f, new Color(238,238,238));
+                dY = drawField(cs, dPadX, dY, "Total en letras:", safe(req.totalEnLetras));
+
+// fila: condición (gris)
+                rowBg(cs, ml + 1f, dY + 2f, leftW - 2f, 12f, new Color(238,238,238));
+                dY = drawField(cs, dPadX, dY, "Condicion de la Operacion:", "CONTADO - N1");
+
+// separador sutil
+                drawLine(cs, dPadX, dY - 2f, ml + leftW - 8f, dY - 2f, .6f, Color.LIGHT_GRAY);
+                dY -= 10f;
+
+// grid “Responsable / N° Documento”
+                float detMid = ml + leftW/2f;
+                rowBg(cs, ml + 1f, dY + 2f, leftW - 2f, 12f, new Color(238,238,238));
+                cs.setFont(fontBold, 6.3f);
+                drawText(cs, dPadX, dY, "Responsable por parte del EMISOR:");
+                drawRight(cs, detMid + 6f, ml + leftW - 8f, dY, "N° Documento:");
+                cs.setFont(fontReg, 6.3f);
+                dY -= 14f;
+
+                rowBg(cs, ml + 1f, dY + 2f, leftW - 2f, 12f, new Color(238,238,238));
+                cs.setFont(fontBold, 6.3f);
+                drawText(cs, dPadX, dY, "Responsable por parte del RECEPTOR:");
+                drawRight(cs, detMid + 6f, ml + leftW - 8f, dY, "N° Documento:");
+                cs.setFont(fontReg, 6.3f);
+                dY -= 14f;
+
+// línea vertical central del panel izquierdo
+                drawLine(cs, detMid, blockTop - 16f, detMid, blockTop - boxH + 4f, 1f, Color.BLACK);
+
+// resto de filas (alternando grises)
+                rowBg(cs, ml + 1f, dY + 2f, leftW - 2f, 12f, new Color(238,238,238));
+                dY = drawField(cs, dPadX, dY, "Numero de control Vidri:", safe(req.numeroControl).replace("DTE-01-",""));
+
+                rowBg(cs, ml + 1f, dY + 2f, leftW - 2f, 12f, new Color(238,238,238));
+                dY = drawField(cs, dPadX, dY, "Vendedor:", "0000S63");
+
+                rowBg(cs, ml + 1f, dY + 2f, leftW - 2f, 12f, new Color(238,238,238));
+                dY = drawField(cs, dPadX, dY, "Codigo interno:", "C00080925");
+
+// borde base del panel (ya lo deja drawBox, no hace falta extra)
+
+// ---------- Caja derecha ("Suma Total de Operaciones") ----------
                  rightX = ml + leftW;
-                drawBox(cs, rightX, blockTop, rightW, 120f, new Color(212,60,60), 1.2f);
-                cs.setFont(fontBold, 9f);
+                drawBox(cs, rightX, blockTop, rightW, boxH, new Color(212,60,60), 1.2f);
+                cs.setFont(fontBold, 7.6f);
                 cs.setNonStrokingColor(Color.WHITE);
                 drawText(cs, rightX + 8f, blockTop + 5f, "Suma Total de Operaciones");
                 cs.setNonStrokingColor(Color.BLACK);
-                cs.setFont(fontReg, 8.5f);
+
+// tipografía más chica para que nada se salga
+                cs.setFont(fontReg, 6.3f);
 
                 float ty = blockTop - 16f;
-                ty = drawKV(cs, rightX + 8f, ty, "Ventas no Sujetas:", "$0.00");
-                ty = drawKV(cs, rightX + 8f, ty, "Total Gravada:", "$" + safe(req.total));
-                ty = drawKV(cs, rightX + 8f, ty, "Monto Global Descuento, Bonificación, Rebajas y Otros a Ventas Gravadas:", "$0.00");
-                ty = drawKV(cs, rightX + 8f, ty, "Sumatoria de Ventas:", "$" + safe(req.total));
-                ty = drawKV(cs, rightX + 8f, ty, "Sub-Total:", "$" + safe(req.total));
-                ty = drawKV(cs, rightX + 8f, ty, "IVA Percibido:", "$0.00");
-                ty = drawKV(cs, rightX + 8f, ty, "IVA Retenido:", "$0.00");
-                ty = drawKV(cs, rightX + 8f, ty, "Retención Renta:", "$0.00");
-                ty = drawKV(cs, rightX + 8f, ty, "Monto Total de la Operación:", "$" + safe(req.total));
-                ty = drawKV(cs, rightX + 8f, ty, "Total otros Montos no Afectos:", "$0.00");
+                final float rightLimit = rightX + rightW - 10f;
 
-                // Banda final total a pagar
+// columna separadora (valores a la derecha)
+                float valueColX = rightX + rightW - 90f; // separador vertical como en tu ejemplo
+                drawLine(cs, valueColX, blockTop - 16f, valueColX, blockTop - boxH + 4f, 1f, Color.BLACK);
+
+// helper para filas con alternado gris
+                ty = kvRow(cs, rightX + 8f, ty, rightLimit, "Ventas no Sujetas:", "$0.00", true);
+                ty = kvRow(cs, rightX + 8f, ty, rightLimit, "Total Gravada:", "$" + safe(req.total), false);
+                ty = kvRow(cs, rightX + 8f, ty, rightLimit, "Monto Global Descuento y Otros a Ventas Gravadas:", "$0.00", true);
+                ty = kvRow(cs, rightX + 8f, ty, rightLimit, "Sumatoria de Ventas:", "$" + safe(req.total), false);
+                ty = kvRow(cs, rightX + 8f, ty, rightLimit, "Sub-Total:", "$" + safe(req.total), true);
+                ty = kvRow(cs, rightX + 8f, ty, rightLimit, "IVA Percibido:", "$0.00", false);
+                ty = kvRow(cs, rightX + 8f, ty, rightLimit, "IVA Retenido:", "$0.00", true);
+                ty = kvRow(cs, rightX + 8f, ty, rightLimit, "Retencion Renta:", "$0.00", false);
+                ty = kvRow(cs, rightX + 8f, ty, rightLimit, "Monto Total de la Operacion:", "$" + safe(req.total), true);
+                ty = kvRow(cs, rightX + 8f, ty, rightLimit, "Total otros Montos no Afectos:", "$0.00", false);
+
+// Barra "Total a pagar" siempre dentro
                 float payBarH = 14f;
+                float bottomY = blockTop - boxH;
+                float payY = Math.max(bottomY + 4f, ty - payBarH); // nunca por debajo del borde
+
                 cs.setNonStrokingColor(new Color(212,60,60));
-                cs.addRect(rightX, ty - payBarH, rightW, payBarH);
+                cs.addRect(rightX, payY, rightW, payBarH);
                 cs.fill();
+
                 cs.setNonStrokingColor(Color.WHITE);
-                cs.setFont(fontBold, 9.5f);
-                drawRight(cs, rightX + 8f, rightX + rightW - 8f, ty - payBarH + 3.5f, "Total a pagar: $" + safe(req.total));
+                cs.setFont(fontBold, 8.3f);
+                drawRight(cs, rightX + 8f, rightX + rightW - 12f, payY + 3.5f, "Total a pagar: $" + safe(req.total));
+
             }
 
             try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -304,15 +376,32 @@ public class FacturaPdfService {
         return y - 12f;
     }
 
-    private static float drawKV(PDPageContentStream cs, float x, float y, String k, String v) throws IOException {
-        drawText(cs, x, y, k);
-        drawRight(cs, x, x + 240f, y, v);
-        return y - 12f;
-    }
-
     private static BufferedImage qr(String data, int width, int height) throws WriterException {
         QRCodeWriter writer = new QRCodeWriter();
         BitMatrix bm = writer.encode(data, BarcodeFormat.QR_CODE, width, height);
         return MatrixToImageWriter.toBufferedImage(bm);
     }
+    // fondo de fila (rectángulo)
+    private static void rowBg(PDPageContentStream cs, float x, float y, float w, float h, Color c) throws IOException {
+        cs.setNonStrokingColor(c);
+        cs.addRect(x, y - h + 2f, w, h); // y viene “en baseline”; ajustamos
+        cs.fill();
+        cs.setNonStrokingColor(Color.BLACK);
+    }
+
+    // fila clave: valor con fondo alterno
+    private static float kvRow(PDPageContentStream cs, float x, float y, float xRight, String k, String v, boolean gray) throws IOException {
+        if (gray) rowBg(cs, x - 7f, y + 2f, (xRight - (x - 7f)), 12f, new Color(238,238,238));
+        drawText(cs, x, y, k);
+        drawRight(cs, x, xRight, y, v);
+        return y - 12f;
+    }
+
+    // drawKV con límite derecho configurable (por si lo usas en otro lado)
+    private static float drawKV(PDPageContentStream cs, float x, float y, String k, String v, float xRight) throws IOException {
+        drawText(cs, x, y, k);
+        drawRight(cs, x, xRight, y, v);
+        return y - 11f;
+    }
+
 }
