@@ -15,6 +15,7 @@ import java.util.Base64;
 
 @RestController
 @RequestMapping("/api/factura")
+@CrossOrigin(origins = "*")
 public class FacturaController {
 
     private final FacturaPdfService pdfService = new FacturaPdfService();
